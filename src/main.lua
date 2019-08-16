@@ -1,6 +1,14 @@
 local controllers = require('input/controllers')
-local Player = require('entity/Player')
-local Platform = require('entity/Platform')
+local Game = require('game/Game')
+
+-- Update loop
+-- 1. Don't do anything to static platforms
+-- 2. Update moving platforms
+-- 3. Update enemies, checking for collisions
+-- 4. Update player position in steps, checking for collision after each step
+-- 5. Check for hits
+-- 6. Update camera
+-- 7. Add new entities to the game
 
 -- Constants
 local KEYBOARD_CONTROLS = {
@@ -15,43 +23,23 @@ local KEYBOARD_CONTROLS = {
 }
 
 -- Game variables
-local entities
+local game
 
 function love.load()
-  -- Initialize controllers
-  local playerController = controllers:newController()
-  controllers.keyboard:pipe(playerController, KEYBOARD_CONTROLS)
-  -- Spawn entities
-  entities = {}
-  table.insert(entities, Player:new({
-    controller = playerController,
-    x = 50,
-    y = 50,
-    width = 10,
-    height = 20
-  }))
-  table.insert(entities, Platform:new({
-    x = 40,
-    y = 100,
-    width = 200,
-    height = 25
-  }))
+  -- Initialize the game
+  game = Game:new()
 end
 
 function love.update(dt)
   -- Update controllers
   controllers:update(dt)
-  -- Update entities
-  for _, entity in ipairs(entities) do
-    entity:update(dt)
-  end
+  -- Update the game
+  game:update(dt)
 end
 
 function love.draw()
   -- Clear the screen
-  love.graphics.clear(0.1, 0.1, 0.1)
-  -- Draw entities
-  for _, entity in ipairs(entities) do
-    entity:draw()
-  end
+  love.graphics.clear(0, 0, 0)
+  -- Draw the game
+  game:draw()
 end

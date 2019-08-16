@@ -17,6 +17,14 @@ local function defineClass(superclass, class)
     end
     return instance
   end
+  -- Add a :newFromObject method onto the class
+  class.newFromObject = function(self, instance, ...)
+    setmetatable(instance, { __index = self })
+    if instance.init then
+      instance:init(...)
+    end
+    return instance
+  end
   -- Return the class
   return class
 end
