@@ -11,12 +11,16 @@ local Platform = require('entity/Platform')
 -- 4. Update player position in steps, checking for collision after each step
 -- 5. Check for hits
 -- 6. Update camera
--- 7. Add new entities to the game\
+-- 7. Add new entities to the game
 
 local Game = defineClass({
   entities = nil,
+  players = nil,
+  platforms = nil,
   init = function(self)
     self.entities = {}
+    self.players = {}
+    self.platforms = {}
     -- Create a new controller for the playerController
     local playerController = controllers:newController()
     controllers.keyboard:pipe(playerController, constants.KEYBOARD_CONTROLS)
@@ -54,8 +58,20 @@ local Game = defineClass({
     end
   end,
   spawnEntity = function(self, class, ...)
+    -- Create the entity
     local entity = class:newFromObject({ game = self }, ...)
-    table.insert(self.entities, entity)
+    -- Add to groups
+    if entity.groups then
+      for _, group in ipairs(entity.groups) do
+        table.insert(self.entities, entity)
+        if group == 'players' then
+          table.insert(self.players, entity)
+        elseif group == 'platforms' then
+          table.insert(self.platforms, entity)
+        end
+      end
+    end
+    -- Return the entitiy
     return entity
   end
 })
