@@ -1,9 +1,11 @@
 local defineClass = require('utils/defineClass')
 
 local Sprite = defineClass({
-  init = function(self, img, quad)
+  init = function(self, img, rect)
     self._img = img
-    self._quad = quad
+    self._rect = rect
+    local width, height = img:getDimensions()
+    self._quad = love.graphics.newQuad(rect[1], rect[2], rect[3], rect[4], width, height)
   end,
   draw = function(self, x, y, flipHorizontal, flipVertical)
     -- Apply defaults
@@ -16,8 +18,8 @@ local Sprite = defineClass({
     -- Draw the sprite
     love.graphics.draw(self._img,
       self._quad,
-      x,
-      y,
+      x + (flipHorizontal and self._rect[3] or 0),
+      y + (flipVertical and self._rect[4] or 0),
       0,
       flipHorizontal and -1 or 1,
       flipVertical and -1 or 1)
