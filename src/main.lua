@@ -13,7 +13,7 @@ function love.update(dt)
   -- Update controllers
   controllers:update(dt)
   -- Update the game
-  game:update(dt)
+  game:update(1 / 60)
 end
 
 function love.draw()

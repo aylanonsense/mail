@@ -57,12 +57,18 @@ local Game = defineClass({
     })
     self:spawnEntity(Platform, {
       x = -450,
+      y = -48,
+      width = 48,
+      height = 48
+    })
+    self:spawnEntity(Platform, {
+      x = -600,
       y = -56,
       width = 56,
       height = 56
     })
     self:spawnEntity(Platform, {
-      x = -600,
+      x = -750,
       y = -64,
       width = 64,
       height = 64
