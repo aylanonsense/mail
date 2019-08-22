@@ -6,7 +6,8 @@ local KEYBOARD_CONTROLS = {
   up = 'up',
   left = 'left',
   down = 'down',
-  right = 'right'
+  right = 'right',
+  space = 'jump'
 }
 
 return {

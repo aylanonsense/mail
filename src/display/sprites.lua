@@ -9,7 +9,7 @@ local mailgirlSpriteSheet = love.graphics.newImage('../img/mailgirl.png')
 local mailgirlGrid = RectGrid:new(0, 0, 44, 52, 6, 2, { bleed = 1 })
 local mailgirlRects = {
   standing = mailgirlGrid:getRect(1),
-  running = mailgirlGrid:getRects(2, 7)
+  running = mailgirlGrid:getRects(2, 5)
 }
 
 -- Generates sprites from an image and set of rectangles

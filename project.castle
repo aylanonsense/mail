@@ -3,7 +3,7 @@ name: mail
 description: A platformer powered by mail.
 username: bridgs
 main: src/main.lua
-dimensions: 250x250
+dimensions: 360x240
 scaling: on
 primaryColor: CCCCCC
  

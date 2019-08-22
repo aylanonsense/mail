@@ -20,5 +20,7 @@ function love.draw()
   -- Clear the screen
   love.graphics.clear(0, 0, 0)
   -- Draw the game
+  love.graphics.push()
   game:draw()
+  love.graphics.pop()
 end
