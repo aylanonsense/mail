@@ -5,7 +5,8 @@ local sprites = require('display/sprites')
 
 local Player = defineClass(Entity, {
   minimumGroundSpeed = 4,
-  initialJumpSpeed = 222,
+  initialJumpSpeed = 240,
+  initialDoubleJumpSpeed = 180,
   minimumAirSpeed = 1,
   groups = { 'players' },
   vxRelative = 0,
@@ -21,9 +22,14 @@ local Player = defineClass(Entity, {
   groundedMoveSprite = 1,
   spriteFrames = 0,
   verticalVelocitySource = nil,
+  framesSinceLastStanding = 0,
+  framesSinceJump = 0,
   vxWorld = 0,
+  hasDoubleJump = false,
   update = function(self, dt)
     self.spriteFrames = self.spriteFrames + 1
+    self.framesSinceLastStanding = self.framesSinceLastStanding + 1
+    self.framesSinceJump = self.framesSinceJump + 1
     local moveX = (self.controller:isDown('right') and 1 or 0) - (self.controller:isDown('left') and 1 or 0)
     local moveY = (self.controller:isDown('down') and 1 or 0) - (self.controller:isDown('up') and 1 or 0)
     -- Figure out the speed of the ground the player is standing on or the air
@@ -92,21 +98,22 @@ local Player = defineClass(Entity, {
         vxRelative = (vxRelative < 0 and -1 or 1) * self:decelerateAirSpeed(speed, true)
       end
       -- Updating facing
-      if vxRelative > 0 and moveX > 0 then
+      if moveX > 0 then
         self.facingDir = 1
-      elseif vxRelative < 0 and moveX < 0 then 
+      elseif moveX < 0 then
         self.facingDir = -1
       end
       self.vx = vxRelative + self.vxWorld
     end
     -- Jump
     local justJumped = false
-    if self.isStanding and self.controller:justPressed('jump', 6, true) then
+    if (self.isStanding or (self.framesSinceLastStanding < 7 and self.verticalVelocitySource == 'fall')) and self.controller:justPressed('jump', 6, true) then
       justJumped = true
       self.vy = -self.initialJumpSpeed
       self.isStanding = false
       self.standingPlatform = nil
       self.verticalVelocitySource = 'jump'
+      self.framesSinceJump = 0
       if moveX ~= 0 then
         local vxRelative = self.vx - self.vxWorld
         local speed = math.abs(vxRelative)
@@ -119,6 +126,30 @@ local Player = defineClass(Entity, {
         end
         self.vx = vxRelative + self.vxWorld
       end
+    end
+    -- Double jump
+    if self.hasDoubleJump and not self.isStanding and self.framesSinceLastStanding > 7 and self.controller:justPressed('jump', 5, true) then
+      justJumped = true
+      self.hasDoubleJump = false
+      self.verticalVelocitySource = 'jump'
+      self.vy = -self.initialDoubleJumpSpeed
+      self.framesSinceJump = 0
+      local vxRelative = self.vx - self.vxWorld
+      local speed = math.abs(vxRelative)
+      if moveX == 0 then
+        vxRelative = (vxRelative > 0 and 1 or -1) * self:applyNeutralDoubleJump(speed)
+      elseif speed == 0 then
+        vxRelative = moveX * self:applyForwardDoubleJump(speed)
+      elseif (moveX > 0) == (vxRelative > 0) then
+        vxRelative = (vxRelative > 0 and 1 or -1) * self:applyForwardDoubleJump(speed)
+      else
+        vxRelative = (vxRelative > 0 and 1 or -1) * self:applyBackwardDoubleJump(speed)
+      end
+      self.vx = vxRelative + self.vxWorld
+    end
+    -- Cut jump short
+    if self.verticalVelocitySource == 'jump' and self.framesSinceJump > 6 and not self.controller:isDown('jump') then
+      self.vy = math.max(-90, self.vy)
     end
     -- Update grounded movement sprite
     if self.isStanding then
@@ -161,22 +192,28 @@ local Player = defineClass(Entity, {
     self:checkForCollisions(self.x + self.horizontalCollisionPadding, self.y + self.height / 2, self.width - 2 * self.horizontalCollisionPadding, self.height / 2, function(platform)
       self.y = platform.y - self.height
       self.vy = math.min(self.vy, platform.vy)
-      self.standingPlatform = platform
-      self.vxWorld = self.standingPlatform.vx
-      self.verticalVelocitySource = nil
-      if not self.isStanding and not wasStanding then
-        self.groundedMoveSprite = 1
-        self.spriteFrames = 0
-        if moveX ~= 0 then
+      local vyRelative = self.vy - platform.vy
+      if vyRelative >= -5 then
+        -- Land on the platform
+        vyRelative = 0
+        self.vy = vyRelative + platform.vy
+        self.standingPlatform = platform
+        self.vxWorld = self.standingPlatform.vx
+        self.verticalVelocitySource = nil
+        if not self.isStanding and not wasStanding then
+          self.groundedMoveSprite = 1
+          self.spriteFrames = 0
           local vxRelative = self.vx - self.vxWorld
-          if vxRelative ~= 0 and (vxRelative > 0) ~= (moveX > 0) then
+          if vxRelative ~= 0 and (moveX == 0 or (vxRelative > 0) ~= (moveX > 0)) then
             local speed = math.abs(vxRelative)
             vxRelative = (vxRelative > 0 and 1 or -1) * self:decelerateLandingSpeed(speed)
             self.vx = vxRelative + self.vxWorld
           end
         end
+        self.isStanding = true
+        self.framesSinceLastStanding = 0
+        self.hasDoubleJump = true
       end
-      self.isStanding = true
     end)
     -- Check for left collisions
     self:checkForCollisions(self.x, self.y + self.verticalCollisionPadding, self.width / 2, self.height - 2 * self.verticalCollisionPadding, function(platform)
@@ -193,7 +230,7 @@ local Player = defineClass(Entity, {
       self.y = platform.y + platform.height
       self.vy = math.max(self.vy, platform.vy)
     end)
-    if wasStanding and not self.isStanding then
+    if wasStanding and not self.isStanding and not justJumped then
       self.verticalVelocitySource = 'fall'
     end
   end,
@@ -214,13 +251,15 @@ local Player = defineClass(Entity, {
     local speedRelative = math.abs(self.vx - self.vxWorld)
     if self.isStanding and speedRelative >= 10 then
       sprite = spriteSheet.running[self.groundedMoveSprite]
-    else
+    elseif self.isStanding then
       sprite = spriteSheet.standing
+    else
+      sprite = spriteSheet.jumping
     end
     love.graphics.setColor(1, 1, 1)
     sprite:draw(self.x - 14, self.y - 15, self.facingDir < 0)
     love.graphics.setColor(0, 0, 0)
-    love.graphics.print(math.floor(self.vx), self.x, self.y - 20)
+    -- love.graphics.print(math.floor(self.vy), self.x, self.y - 20)
   end,
   checkForCollisions = function(self, x, y, width, height, callback)
     for _, platform in ipairs(self.game.platforms) do
@@ -232,29 +271,31 @@ local Player = defineClass(Entity, {
   applyGravity = function(self, vy, source)
     local change
     -- On the way up, apply a lot of gravity
-    if vy >= 5 then
-      change = 15
+    if vy <= -5 then
+      change = 11
     -- Toward the apex, apply less
-    elseif vy >= -2 then
-      change = 4.5
+    elseif vy <= 5 then
+      change = 5
     -- Then apply a bit more on the way down
     else
       change = 9
     end
-    return vy + change
+    return math.min(math.max(300, vy), vy + change)
   end,
   accelerateGroundSpeed = function(self, speed)
     local change
     -- Accelerate quickly
-    if speed <= 175 then
-      change = 5.5
+    if speed <= 75 then
+      change = 3.5
+    elseif speed <= 175 then
+      change = 5.0
     -- Then start slowing down acceleration
     elseif speed <= 225 then
       change = 1.5
     else
       change = 0.5
     end
-    return math.max(10, speed, math.min(250, speed + change))
+    return math.max(15, speed, math.min(250, speed + change))
   end,
   decelerateGroundSpeed = function(self, speed, active)
     local change
@@ -262,15 +303,15 @@ local Player = defineClass(Entity, {
       if speed <= 100 then
         change = 20
       else
-        change = 6
+        change = 10
       end
     else
       if speed <= 25 then
-        change = 1.5
+        change = 2
       elseif speed <= 100 then
-        change = 5
+        change = 8
       else
-        change = 3
+        change = 5
       end
     end
     return math.max(0, speed - change)
@@ -278,21 +319,21 @@ local Player = defineClass(Entity, {
   accelerateAirSpeed = function(self, speed)
     local change
     if speed <= 20 then
-      change = 10
-    elseif speed <= 150 then
-      change = 3.5
+      change = 14
+    elseif speed <= 125 then
+      change = 3
     else
-      change = 1.5
+      change = 1
     end
-    return math.max(15, math.min(250, speed + change), speed)
+    return math.max(0, math.min(250, speed + change), speed)
   end,
   decelerateAirSpeed = function(self, speed, active)
     if active then
       local change
       if speed <= 50 then
-        change = 10
+        change = 14
       elseif speed <= 125 then
-        change = 6
+        change = 10
       elseif speed <= 225 then
         change = 5
       else
@@ -300,17 +341,28 @@ local Player = defineClass(Entity, {
       end
       return math.max(-1, speed - change)
     else
-      return speed
+      return math.max(0, speed - 0.5)
     end
   end,
   accelerateJumpSpeed = function(self, speed)
-    return math.max(speed, math.min(speed + 15, 150))
+    return math.max(speed, math.min(speed + 10, 150))
   end,
   decelerateJumpSpeed = function(self, speed)
-    return math.max(0, speed - 30)
+    return math.max(0, speed - 20)
   end,
   decelerateLandingSpeed = function(self, speed)
     return math.max(math.min(speed, 10), speed - 15)
+  end,
+  applyNeutralDoubleJump = function(self, speed)
+    return 0.8 * speed
+  end,
+  applyForwardDoubleJump = function(self, speed)
+    local change = math.min(math.max(0, 25 * (1 - speed / 150)), 25)
+    return math.min(math.max(250, speed), speed + change)
+  end,
+  applyBackwardDoubleJump = function(self, speed)
+    local change = math.min(math.max(10, 10 + 35 * (speed / 150)), 45)
+    return math.max(0, speed - change)
   end
 })
 
